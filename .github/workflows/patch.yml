@@ -1,0 +1,55 @@
+name: Packaging
+on: push
+
+env:
+  base_ver: 7.x-4.28
+
+jobs:
+  build:
+    name: Packaging
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Project to be patched
+        run: |
+          cd ..
+          pwd
+          wget https://ftp.drupal.org/files/projects/webform_civicrm-7.x-4.28.tar.gz
+          tar xzf ./webform_civicrm-7.x-4.28.tar.gz
+          ls -la
+
+      - name: Checkout the fork
+        uses: actions/checkout@v2-beta
+        with:
+          ref: ${{ env.base_ver }}
+
+      - name: Create patched package
+        uses: 'compucorp/create-patch-from-fork@master'
+        id: "patch"
+        with:
+          base_version: ${{ env.base_ver }}
+          project_dir: '../webform_civicrm'
+          project_name: 'webform_civicrm'
+          project_type: 'drupal-module'
+
+      - name: Create a new release
+        id: create_release
+        uses: compucorp/create-release@target_commitish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: "${{ steps.patch.outputs.version }}"
+          target_commitish: "${{ github.sha }}"
+          release_name: "${{ steps.patch.outputs.version }}"
+          body: "${{ steps.patch.outputs.version }}"
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: "${{ steps.patch.outputs.package }}"
+          asset_name: "${{ steps.patch.outputs.package }}"
+          asset_content_type: application/gzip
